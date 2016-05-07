@@ -35,7 +35,7 @@ defmodule Echo.UserSocket do
       nil ->
         :error
       {user, device} ->
-        {:ok, assign(socket, :auth, %{user: %{id: user.id, name: user.name}, device: %{id: device.id, name: device.name}})}
+        {:ok, assign(socket, :auth, %{token: session_token, user: %{id: user.id, name: user.name}, device: %{id: device.id, name: device.name}})}
     end
   end
 

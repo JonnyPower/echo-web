@@ -4,6 +4,7 @@ defmodule Echo.Device do
   schema "devices" do
     field :token, :string
     field :name, :string
+    field :type, :string
     belongs_to :user, Echo.User, foreign_key: :user_id
 
     has_one :session, Echo.Session
@@ -12,7 +13,7 @@ defmodule Echo.Device do
     timestamps
   end
 
-  @required_fields ~w(name user_id)
+  @required_fields ~w(name user_id type)
   @optional_fields ~w(token)
 
   @doc """

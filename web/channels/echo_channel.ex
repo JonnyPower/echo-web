@@ -6,13 +6,15 @@ defmodule Echo.EchoChannel do
   alias Echo.Message
   alias Echo.Repo
   alias Echo.Notify
+  alias Echo.Session
   import Ecto.Query, only: [from: 2]
 
   def join("echoes:" <> name, _payload, socket) do
     if socket.assigns.auth.user.name == name do
       Echo.Endpoint.broadcast_from! self(), "echoes:" <> name,
-        "presense", %{status: "Online", name: socket.assigns.auth.device.name}
-      {:ok, %{messages: history(0, socket.assigns.auth.user.id)}, socket}
+        "presense", %{status: "Online", id: socket.assigns.auth.device.id}
+      session = Repo.get_by!(Session, token: socket.assigns.auth.token)
+      {:ok, %{messages: history(0, socket.assigns.auth.user.id, session.timezone)}, socket}
     else
       {:error, %{reason: "unauthorized"}}
     end
@@ -26,11 +28,12 @@ defmodule Echo.EchoChannel do
 
   def handle_in("whoami", _payload, socket) do
     device = Repo.get!(Device, socket.assigns.auth.device.id)
-    {:reply, {:ok, %{name: device.name, token: device.token}}, socket}
+    {:reply, {:ok, %{name: device.name, token: device.token, type: device.type}}, socket}
   end
 
   def handle_in("history", %{"days" => days}, socket) do
-    {:reply, {:ok, %{messages: history(days, socket.assigns.auth.user.id)}}, socket}
+    session = Repo.get_by!(Session, token: socket.assigns.auth.token)
+    {:reply, {:ok, %{messages: history(days, socket.assigns.auth.user.id, session.timezone)}}, socket}
   end
 
   # It is also common to receive messages from the client and
@@ -60,8 +63,8 @@ defmodule Echo.EchoChannel do
     {:noreply, socket}
   end
 
-  defp history(days, user_id) do
-    since = DateTime.now
+  defp history(days, user_id, timezone) do
+    since = DateTime.now(timezone)
     |> DateTime.set([{:hour, 0}, {:minute, 0}, {:second, 0}])
     |> DateTime.shift(days: 0 - days)
 
@@ -76,7 +79,7 @@ defmodule Echo.EchoChannel do
     |> Enum.map(
       fn(message) ->
         {:ok, sent_formattted} = Timex.format(message.sent, "{ISO:Extended}")
-        %{id: message.id, content: message.content, sent: sent_formattted, from: %{name: message.device.name, id: message.device.id}}
+        %{id: message.id, content: message.content, sent: sent_formattted, from: %{name: message.device.name, id: message.device.id, type: message.device.type}}
       end
     )
   end

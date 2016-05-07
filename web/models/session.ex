@@ -3,12 +3,13 @@ defmodule Echo.Session do
 
   schema "sessions" do
     field :token, :string
+    field :timezone, :string
     belongs_to :device, Echo.Device
 
     timestamps
   end
 
-  @required_fields ~w(token device_id)
+  @required_fields ~w(token device_id session)
   @optional_fields ~w()
 
   @doc """

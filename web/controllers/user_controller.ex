@@ -22,61 +22,76 @@ defmodule Echo.UserController do
 
   end
 
-  def login(conn, %{"name" => name, "password" => password, "device_token" => device_token, "device_name" => device_name}) do
-    name = name
-    |> String.downcase
+  def login(conn, %{
+      "name" => name, 
+      "password" => password, 
+      "device" => %{
+        "token" => device_token, 
+        "name" => device_name, 
+        "type" => device_type
+      },
+      "timezone" => timezone
+    }) do
 
-    user = Repo.get_by(User, name: name)
+    case device_type do
+      "iOS" ->
+        name = name
+        |> String.downcase
 
-    if device_token == "" do
-      device_token = nil
-    end
+        user = Repo.get_by(User, name: name)
 
-    case user do
-      nil ->
-        json conn, %{success: false, error: "NOT-REGISTERED", message: "A user with that name is not registered."}
-      user ->
-        if Bcrypt.checkpw(password, user.password) do
-
-          device = if device_token, do: Repo.get_by(Device, %{user_id: user.id, token: device_token}, else: nil)
-          case device do
-            nil ->
-              device = Ecto.build_assoc(user, :devices, %{token: device_token, name: device_name})
-              case Repo.insert(device) do
-                {:ok, new_device} ->
-                  device = new_device
-                {:error, changeset} ->
-                  json conn, %{success: false, error: "INVALID", message: changeset}
-              end
-            %Device{} ->
-              changeset = Device.changeset(device, %{name: device_name})
-              case Repo.update(changeset) do
-                {:ok, new_device} ->
-                  device = new_device
-                {:error, changeset} ->
-                  json conn, %{success: false, error: "INVALID", message: changeset}
-              end
-          end
-
-          session = Session
-          |> Repo.get_by(device_id: device.id)
-
-          if session != nil do
-            end_session session
-          end
-
-          session_token = SecureRandom.base64(32)
-          new_session = Ecto.build_assoc(device, :session, %{token: session_token})
-          case Repo.insert(new_session) do
-            {:ok, _session} ->
-              json conn, %{success: true, session_token: session_token}
-            {:error, changeset} ->
-              json conn, %{success: false, error: "FAILED-TO-CREATE-SESSION", message: changeset}
-          end
-
-        else
-          json conn, %{success: false, error: "INVALID-PASSWORD", message: "The password did not match our records"}
+        if device_token == "" do
+          device_token = nil
         end
+
+        case user do
+          nil ->
+            json conn, %{success: false, error: "NOT-REGISTERED", message: "A user with that name is not registered."}
+          user ->
+            if Bcrypt.checkpw(password, user.password) do
+
+              device = if device_token, do: Repo.get_by(Device, %{user_id: user.id, token: device_token}, else: nil)
+              case device do
+                nil ->
+                  device = Ecto.build_assoc(user, :devices, %{token: device_token, name: device_name, type: device_type})
+                  case Repo.insert(device) do
+                    {:ok, new_device} ->
+                      device = new_device
+                    {:error, changeset} ->
+                      json conn, %{success: false, error: "INVALID", message: changeset}
+                  end
+                %Device{} ->
+                  changeset = Device.changeset(device, %{name: device_name, type: device_type})
+                  case Repo.update(changeset) do
+                    {:ok, new_device} ->
+                      device = new_device
+                    {:error, changeset} ->
+                      json conn, %{success: false, error: "INVALID", message: changeset}
+                  end
+              end
+
+              session = Session
+              |> Repo.get_by(device_id: device.id)
+
+              if session != nil do
+                end_session session
+              end
+
+              session_token = SecureRandom.base64(32)
+              new_session = Ecto.build_assoc(device, :session, %{token: session_token, timezone: timezone})
+              case Repo.insert(new_session) do
+                {:ok, _session} ->
+                  json conn, %{success: true, session_token: session_token}
+                {:error, changeset} ->
+                  json conn, %{success: false, error: "FAILED-TO-CREATE-SESSION", message: changeset}
+              end
+
+            else
+              json conn, %{success: false, error: "INVALID-PASSWORD", message: "The password did not match our records"}
+            end
+        end
+      _ ->
+        json conn, %{success: false, error: "INVALID-DEVICE-TYPE", message: "The device type is not recognised"}
     end
 
   end
