@@ -7,12 +7,11 @@ defmodule Echo.EchoChannelTest do
   alias Echo.EchoChannel
   alias Echo.Repo
   alias Echo.User
-  alias Echo.Message
 
   setup do
     {:ok, user} = Repo.insert(User.changeset(%User{}, %{name: "test_user", password: Bcrypt.hashpwsalt("test_password")}))
     {:ok, device} = Repo.insert(Ecto.build_assoc(user, :devices, %{name: "test_device", token: "test_device_token"}))
-    {:ok, session} = Repo.insert(Ecto.build_assoc(device, :session, %{token: "test_session_token"}))
+    {:ok, _} = Repo.insert(Ecto.build_assoc(device, :session, %{token: "test_session_token"}))
 
     {:ok, _, socket} =
       socket("device_id:" <> Integer.to_string(device.id), %{auth: %{user: %{id: user.id, name: user.name}, device: %{id: device.id, name: device.name}}})
@@ -26,24 +25,52 @@ defmodule Echo.EchoChannelTest do
     assert_reply ref, :ok, %{"hello" => "there"}
   end
 
-  test "send message", %{socket: socket} do
+  test "send message sent two days ago", %{socket: socket} do
     content = "test_content"
-
-    {:ok, sent_date} = "2016-05-05T13:00:00Z"
-    |> Parse.DateTime.Parser.parse("{ISO:Extended}")
-    {:ok, sent_formatted} = sent_date
-    |> Format.DateTime.Formatter.format("{ISO:Extended}")
-
-    ref = push socket, "message", %{"content" => content, "sent" => sent_formatted}
-    assert_broadcast "message", %{id: _, content: content, sent: sent_formatted, from: %{name: "test_device", id: _}}
-  end
-
-  test "history", %{socket: socket} do
     
+    sent_formatted = push_message(socket, content)
+
+    assert_broadcast "message", %{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _}}
   end
 
-  test "broadcasts are pushed to the client", %{socket: socket} do
-    broadcast_from! socket, "broadcast", %{"some" => "data"}
-    assert_push "broadcast", %{"some" => "data"}
+  test "history for last day with sent two days ago", %{socket: socket} do
+    content = "test_content"
+    push_message(socket, content, 2)
+
+    ref = push socket, "history", %{"days" => 1}
+    assert_reply ref, :ok, %{messages: []}
   end
+
+  test "history for last day with sent a day ago", %{socket: socket} do
+    content = "test_content"
+    sent_formatted = push_message(socket, content, 1)
+
+    ref = push socket, "history", %{"days" => 1}
+    assert_reply ref, :ok, %{messages: [%{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _}}]}
+  end
+
+  test "history for last two days with sent a day ago", %{socket: socket} do
+    content = "test_content"
+    sent_formatted = push_message(socket, content, 1)
+
+    ref = push socket, "history", %{"days" => 2}
+    assert_reply ref, :ok, %{messages: [%{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _}}]}
+  end
+
+  defp push_message(socket, content) do
+    push_message(socket, content, 0)
+  end
+
+  defp push_message(socket, content, days) do
+    sent_date = DateTime.now
+    |> DateTime.shift(days: 0 - days)
+
+    {:ok, sent_formatted} = sent_date
+    |> Timex.format("{ISO:Extended}")
+
+    push socket, "message", %{"content" => content, "sent" => sent_formatted}
+
+    sent_formatted
+  end
+
 end

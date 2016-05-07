@@ -5,11 +5,14 @@ defmodule Echo.EchoChannel do
   alias Echo.Device
   alias Echo.Message
   alias Echo.Repo
+  alias Echo.Notify
   import Ecto.Query, only: [from: 2]
 
   def join("echoes:" <> name, _payload, socket) do
     if socket.assigns.auth.user.name == name do
-      {:ok, socket}
+      Echo.Endpoint.broadcast_from! self(), "echoes:" <> name,
+        "presense", %{status: "Online", name: socket.assigns.auth.device.name}
+      {:ok, %{messages: history(0, socket.assigns.auth.user.id)}, socket}
     else
       {:error, %{reason: "unauthorized"}}
     end
@@ -21,41 +24,29 @@ defmodule Echo.EchoChannel do
     {:reply, {:ok, payload}, socket}
   end
 
+  def handle_in("whoami", _payload, socket) do
+    device = Repo.get!(Device, socket.assigns.auth.device.id)
+    {:reply, {:ok, %{name: device.name, token: device.token}}, socket}
+  end
+
   def handle_in("history", %{"days" => days}, socket) do
-    since = DateTime.now
-    |> DateTime.shift(days: 0 - days)
-
-    query = from m in Message,
-      join: d in Device, on: m.device_id == d.id,
-      join: u in User, on: d.user_id == u.id,
-      select: m,
-      where: m.sent > ^since and u.id == ^socket.assigns.auth.user.id
-    
-    messages = Repo.all(query)
-    |> Repo.preload(:device)
-    |> Enum.map(
-      fn(message) ->
-        {:ok, sent_formattted} = Format.DateTime.Formatter.format(message.sent, "{ISO:Extended}")
-        %{id: message.id, content: message.content, sent: sent_formattted, from: %{name: message.device.name, id: message.device.id}}
-      end
-    )
-
-    {:reply, {:ok, %{messages: messages}}, socket}
+    {:reply, {:ok, %{messages: history(days, socket.assigns.auth.user.id)}}, socket}
   end
 
   # It is also common to receive messages from the client and
   # broadcast to everyone in the current topic (echoes:lobby).
   def handle_in("message", %{"content" => content, "sent" => sent}, socket) do
     device = Repo.get!(Device, socket.assigns.auth.device.id)
-    
+
     {:ok, date_sent} = sent
-    |> Parse.DateTime.Parser.parse("{ISO:Extended}")
+    |> Timex.parse("{ISO:Extended}")
 
     message = Ecto.build_assoc(device, :messages, %{content: content, sent: date_sent})
     case Repo.insert(message) do
       {:ok, message} ->
-        broadcast socket, "message", %{id: message.id, content: content, sent: sent, from: %{name: socket.assigns.auth.device.name, id: socket.assigns.auth.device.id}}
-        {:noreply, socket}
+        broadcast_from socket, "message", %{id: message.id, content: content, sent: sent, from: %{name: socket.assigns.auth.device.name, id: socket.assigns.auth.device.id}}
+        Task.async(Notify, :notify, [message, device])
+        {:reply, {:ok, %{message_id: message.id}}, socket}
       {:error, error} ->
         {:reply, {:error, %{message: error}}, socket}
     end
@@ -67,6 +58,27 @@ defmodule Echo.EchoChannel do
   def handle_out(event, payload, socket) do
     push socket, event, payload
     {:noreply, socket}
+  end
+
+  defp history(days, user_id) do
+    since = DateTime.now
+    |> DateTime.set([{:hour, 0}, {:minute, 0}, {:second, 0}])
+    |> DateTime.shift(days: 0 - days)
+
+    query = from m in Message,
+      join: d in Device, on: m.device_id == d.id,
+      join: u in User, on: d.user_id == u.id,
+      select: m,
+      where: m.sent > ^since and u.id == ^user_id
+    
+    Repo.all(query)
+    |> Repo.preload(:device)
+    |> Enum.map(
+      fn(message) ->
+        {:ok, sent_formattted} = Timex.format(message.sent, "{ISO:Extended}")
+        %{id: message.id, content: message.content, sent: sent_formattted, from: %{name: message.device.name, id: message.device.id}}
+      end
+    )
   end
 
 end

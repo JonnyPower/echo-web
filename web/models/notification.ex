@@ -1,15 +1,14 @@
-defmodule Echo.Message do
+defmodule Echo.Notification do
   use Echo.Web, :model
 
-  schema "messages" do
-    field :content, :string
-    field :sent, Timex.Ecto.DateTime
+  schema "notifications" do
+    belongs_to :message, Echo.Message
     belongs_to :device, Echo.Device
 
     timestamps
   end
 
-  @required_fields ~w(content sent device_id)
+  @required_fields ~w(message_id device_id)
   @optional_fields ~w()
 
   @doc """
@@ -21,8 +20,8 @@ defmodule Echo.Message do
   def changeset(model, params \\ :empty) do
     model
     |> cast(params, @required_fields, @optional_fields)
-    |> validate_length(:content, min: 1)
+    |> assoc_constraint(:message)
     |> assoc_constraint(:device)
   end
-
+  
 end

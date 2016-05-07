@@ -22,6 +22,9 @@ defmodule Echo.User do
   def changeset(model, params \\ :empty) do
     model
     |> cast(params, @required_fields, @optional_fields)
-    |> unique_constraint(:name)
+    |> update_change(:name, &String.downcase/1)
+    |> validate_format(:name, ~r/[a-z0-9]/)
+    |> validate_format(:password, ~r/^\$[0-9][a-z]\$.*$/)
+    |> unique_constraint(:name, name: :user_unique_name)
   end
 end

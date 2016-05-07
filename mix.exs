@@ -19,7 +19,8 @@ defmodule Echo.Mixfile do
   def application do
     [mod: {Echo, []},
      applications: [:phoenix, :phoenix_html, :cowboy, :logger, :gettext,
-                    :phoenix_ecto, :postgrex, :comeonin, :tzdata, :timex_ecto]]
+                    :phoenix_ecto, :postgrex, :comeonin, :tzdata, :timex_ecto,
+                    :gcm]]
   end
 
   # Specifies which paths to compile per environment.
@@ -40,7 +41,8 @@ defmodule Echo.Mixfile do
      {:comeonin, "~> 2.4"},
      {:secure_random, "~> 0.1"},
      {:timex, "~> 2.1.4"},
-     {:timex_ecto, "~> 1.0.4"}]
+     {:timex_ecto, "~> 1.0.4"},
+     {:gcm, "~> 1.2"}]
   end
 
   # Aliases are shortcut or tasks specific to the current project.

@@ -8,7 +8,7 @@ defmodule Echo.Session do
     timestamps
   end
 
-  @required_fields ~w(token)
+  @required_fields ~w(token device_id)
   @optional_fields ~w()
 
   @doc """
@@ -22,5 +22,6 @@ defmodule Echo.Session do
     |> cast(params, @required_fields, @optional_fields)
     |> unique_constraint(:token, name: "session_unique_token")
     |> unique_constraint(:device_id, name: "session_unique_device")
+    |> assoc_constraint(:device)
   end
 end
