@@ -11,10 +11,10 @@ defmodule Echo.EchoChannelTest do
   setup do
     {:ok, user} = Repo.insert(User.changeset(%User{}, %{name: "test_user", password: Bcrypt.hashpwsalt("test_password")}))
     {:ok, device} = Repo.insert(Ecto.build_assoc(user, :devices, %{name: "test_device", token: "test_device_token"}))
-    {:ok, _} = Repo.insert(Ecto.build_assoc(device, :session, %{token: "test_session_token"}))
+    {:ok, _} = Repo.insert(Ecto.build_assoc(device, :session, %{token: "test_session_token", timezone: "Europe/Dublin"}))
 
     {:ok, _, socket} =
-      socket("device_id:" <> Integer.to_string(device.id), %{auth: %{user: %{id: user.id, name: user.name}, device: %{id: device.id, name: device.name}}})
+      socket("device_id:" <> Integer.to_string(device.id), %{auth: %{token: "test_session_token", user: %{id: user.id, name: user.name}, device: %{id: device.id, name: device.name}}})
       |> subscribe_and_join(EchoChannel, "echoes:" <> user.name)
 
     {:ok, socket: socket}
@@ -27,7 +27,7 @@ defmodule Echo.EchoChannelTest do
 
   test "send message sent two days ago", %{socket: socket} do
     content = "test_content"
-    
+
     sent_formatted = push_message(socket, content)
 
     assert_broadcast "message", %{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _}}

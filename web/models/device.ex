@@ -1,10 +1,15 @@
+import EctoEnum
+defenum TokenStatusEnum, default: "default", registered: "registerd", invalid: "invalid", not_registered: "not_registered"
+defenum DeviceTypeEnum, iOS: "iOS", android: "android", web: "web"
+
 defmodule Echo.Device do
   use Echo.Web, :model
 
   schema "devices" do
     field :token, :string
     field :name, :string
-    field :type, :string
+    field :type, DeviceTypeEnum
+    field :token_status, TokenStatusEnum
     belongs_to :user, Echo.User, foreign_key: :user_id
 
     has_one :session, Echo.Session
@@ -13,7 +18,7 @@ defmodule Echo.Device do
     timestamps
   end
 
-  @required_fields ~w(name user_id type)
+  @required_fields ~w(name user_id type token_status)
   @optional_fields ~w(token)
 
   @doc """

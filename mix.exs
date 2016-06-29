@@ -42,7 +42,8 @@ defmodule Echo.Mixfile do
      {:secure_random, "~> 0.1"},
      {:timex, "~> 2.1.4"},
      {:timex_ecto, "~> 1.0.4"},
-     {:gcm, "~> 1.2"}]
+     {:gcm, "~> 1.2"},
+     {:ecto_enum, "~> 0.3.1"}]
   end
 
   # Aliases are shortcut or tasks specific to the current project.

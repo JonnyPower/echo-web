@@ -5,7 +5,7 @@ defmodule Echo.DeviceTest do
   alias Echo.Device
   alias Echo.User
 
-  @valid_attrs %{token: "device token", name: "test device"}
+  @valid_attrs %{token: "device token", name: "test device", type: :iOS, token_status: :default}
 
   setup do
     {:ok, user} = Repo.insert(User.changeset(%User{}, %{name: "test_user", password: Bcrypt.hashpwsalt("test_password")}))

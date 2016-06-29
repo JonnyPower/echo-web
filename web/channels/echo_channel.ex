@@ -20,8 +20,6 @@ defmodule Echo.EchoChannel do
     end
   end
 
-  # Channels can be used in a request/response fashion
-  # by sending replies to requests from the client
   def handle_in("ping", payload, socket) do
     {:reply, {:ok, payload}, socket}
   end
@@ -36,8 +34,6 @@ defmodule Echo.EchoChannel do
     {:reply, {:ok, %{messages: history(days, socket.assigns.auth.user.id, session.timezone)}}, socket}
   end
 
-  # It is also common to receive messages from the client and
-  # broadcast to everyone in the current topic (echoes:lobby).
   def handle_in("message", %{"content" => content, "sent" => sent}, socket) do
     device = Repo.get!(Device, socket.assigns.auth.device.id)
 
@@ -47,17 +43,17 @@ defmodule Echo.EchoChannel do
     message = Ecto.build_assoc(device, :messages, %{content: content, sent: date_sent})
     case Repo.insert(message) do
       {:ok, message} ->
-        broadcast_from socket, "message", %{id: message.id, content: content, sent: sent, from: %{name: socket.assigns.auth.device.name, id: socket.assigns.auth.device.id}}
-        Task.async(Notify, :notify, [message, device])
+        broadcast_from socket, "message", message_map(message)
+
+        {:ok, pid} = Supervisor.start_child(Echo.Notify, [message, []])
+        GenServer.cast(pid, :push)
+
         {:reply, {:ok, %{message_id: message.id}}, socket}
       {:error, error} ->
         {:reply, {:error, %{message: error}}, socket}
     end
   end
 
-  # This is invoked every time a notification is being broadcast
-  # to the client. The default implementation is just to push it
-  # downstream but one could filter or change the event.
   def handle_out(event, payload, socket) do
     push socket, event, payload
     {:noreply, socket}
@@ -73,15 +69,25 @@ defmodule Echo.EchoChannel do
       join: u in User, on: d.user_id == u.id,
       select: m,
       where: m.sent > ^since and u.id == ^user_id
-    
+
     Repo.all(query)
+    |> Enum.map(&message_map/1)
+  end
+
+  defp message_map(message) do
+    message = message
     |> Repo.preload(:device)
-    |> Enum.map(
-      fn(message) ->
-        {:ok, sent_formattted} = Timex.format(message.sent, "{ISO:Extended}")
-        %{id: message.id, content: message.content, sent: sent_formattted, from: %{name: message.device.name, id: message.device.id, type: message.device.type}}
-      end
-    )
+    {:ok, sent_formattted} = Timex.format(message.sent, "{ISO:Extended:Z}")
+    %{
+      id: message.id,
+      content: message.content,
+      sent: sent_formattted,
+      from: %{
+        name: message.device.name,
+        id: message.device.id,
+        type: message.device.type
+      }
+    }
   end
 
 end
