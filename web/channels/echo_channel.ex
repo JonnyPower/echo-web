@@ -38,7 +38,7 @@ defmodule Echo.EchoChannel do
     device = Repo.get!(Device, socket.assigns.auth.device.id)
 
     {:ok, date_sent} = sent
-    |> Timex.parse("{ISO:Extended}")
+    |> Timex.parse("{ISO:Basic:Z}")
 
     message = Ecto.build_assoc(device, :messages, %{content: content, sent: date_sent})
     case Repo.insert(message) do
@@ -60,9 +60,9 @@ defmodule Echo.EchoChannel do
   end
 
   defp history(days, user_id, timezone) do
-    since = DateTime.now(timezone)
-    |> DateTime.set([{:hour, 0}, {:minute, 0}, {:second, 0}])
-    |> DateTime.shift(days: 0 - days)
+    since = Timex.now(timezone)
+    |> Timex.set([{:hour, 0}, {:minute, 0}, {:second, 0}])
+    |> Timex.shift(days: 0 - days)
 
     query = from m in Message,
       join: d in Device, on: m.device_id == d.id,
@@ -77,15 +77,17 @@ defmodule Echo.EchoChannel do
   defp message_map(message) do
     message = message
     |> Repo.preload(:device)
-    {:ok, sent_formattted} = Timex.format(message.sent, "{ISO:Extended:Z}")
+    device = message.device
+    |> Repo.preload(:platform)
+    {:ok, sent_formattted} = Timex.format(message.sent, "{ISO:Basic:Z}")
     %{
       id: message.id,
       content: message.content,
       sent: sent_formattted,
       from: %{
-        name: message.device.name,
-        id: message.device.id,
-        type: message.device.type
+        name: device.name,
+        id: device.id,
+        type: device.platform.type
       }
     }
   end

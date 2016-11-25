@@ -57,6 +57,10 @@ defmodule Echo.GCMWorker do
     handle_response(gcm_response, message_content, tokens)
   end
 
+  defp handle_response({:error, :unauthorized}, _, _) do
+    # Configuration error
+  end
+
   defp handle_response({:ok, response}, message_content, tokens) do
     response
     |> handle_not_registered_ids

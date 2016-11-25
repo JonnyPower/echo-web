@@ -41,10 +41,10 @@ defmodule Echo.Mixfile do
      {:cowboy, "~> 1.0"},
      {:comeonin, "~> 2.4"},
      {:secure_random, "~> 0.1"},
-     {:timex, "~> 2.1.4"},
-     {:timex_ecto, "~> 1.0.4"},
+     {:timex, "~> 3.0"},
+     {:timex_ecto, "~> 3.0"},
      {:gcm, "~> 1.2"},
-     {:ecto_enum, "~> 0.3.1"}]
+     {:ecto_enum, git: "https://github.com/mtwilliams/ecto_enum", branch: "master"}]
   end
 
   # Aliases are shortcut or tasks specific to the current project.

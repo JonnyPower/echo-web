@@ -10,7 +10,7 @@ defmodule Echo.EchoChannelTest do
 
   setup do
     {:ok, user} = Repo.insert(User.changeset(%User{}, %{name: "test_user", password: Bcrypt.hashpwsalt("test_password")}))
-    {:ok, device} = Repo.insert(Ecto.build_assoc(user, :devices, %{name: "test_device", token: "test_device_token"}))
+    {:ok, device} = Repo.insert(Ecto.build_assoc(user, :devices, %{name: "test_device", token: "test_device_token", type: "iOS"}))
     {:ok, _} = Repo.insert(Ecto.build_assoc(device, :session, %{token: "test_session_token", timezone: "Europe/Dublin"}))
 
     {:ok, _, socket} =
@@ -30,7 +30,7 @@ defmodule Echo.EchoChannelTest do
 
     sent_formatted = push_message(socket, content)
 
-    assert_broadcast "message", %{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _}}
+    assert_broadcast "message", %{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _, type: _}}
   end
 
   test "history for last day with sent two days ago", %{socket: socket} do
@@ -46,7 +46,7 @@ defmodule Echo.EchoChannelTest do
     sent_formatted = push_message(socket, content, 1)
 
     ref = push socket, "history", %{"days" => 1}
-    assert_reply ref, :ok, %{messages: [%{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _}}]}
+    assert_reply ref, :ok, %{messages: [%{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _, type: _}}]}
   end
 
   test "history for last two days with sent a day ago", %{socket: socket} do
@@ -54,7 +54,7 @@ defmodule Echo.EchoChannelTest do
     sent_formatted = push_message(socket, content, 1)
 
     ref = push socket, "history", %{"days" => 2}
-    assert_reply ref, :ok, %{messages: [%{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _}}]}
+    assert_reply ref, :ok, %{messages: [%{id: _, content: content, sent: ^sent_formatted, from: %{name: "test_device", id: _, type: _}}]}
   end
 
   defp push_message(socket, content) do
@@ -62,11 +62,11 @@ defmodule Echo.EchoChannelTest do
   end
 
   defp push_message(socket, content, days) do
-    sent_date = DateTime.now
-    |> DateTime.shift(days: 0 - days)
+    sent_date = Timex.now
+    |> Timex.shift(days: 0 - days)
 
     {:ok, sent_formatted} = sent_date
-    |> Timex.format("{ISO:Extended}")
+    |> Timex.format("{ISO:Basic:Z}")
 
     push socket, "message", %{"content" => content, "sent" => sent_formatted}
 

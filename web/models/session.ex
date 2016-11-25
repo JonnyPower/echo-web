@@ -5,6 +5,7 @@ defmodule Echo.Session do
     field :token, :string
     field :timezone, :string
     belongs_to :device, Echo.Device
+    belongs_to :client, Echo.Client
 
     timestamps
   end
@@ -24,5 +25,6 @@ defmodule Echo.Session do
     |> unique_constraint(:token, name: "session_unique_token")
     |> unique_constraint(:device_id, name: "session_unique_device")
     |> assoc_constraint(:device)
+    |> assoc_constraint(:client)
   end
 end

@@ -4,6 +4,8 @@ defmodule Echo.UserController do
   alias Echo.User
   alias Echo.Device
   alias Echo.Session
+  alias Echo.Client
+  alias Echo.Platform
 
   def register(conn, %{"name" => name, "password" => password, "confirm" => confirm_password}) do
     name = String.strip(name)
@@ -36,85 +38,102 @@ defmodule Echo.UserController do
   end
 
   def login(conn, %{
-      "name" => name, 
-      "password" => password, 
+      "name" => name,
+      "password" => password,
+      "platform" => %{
+        "type" => platform_type,
+        "version" => platform_version
+      },
       "device" => %{
-        "token" => device_token, 
-        "name" => device_name, 
-        "type" => device_type
+        "token" => device_token,
+        "name" => device_name
+      },
+      "client" => %{
+        "name" => client_name,
+        "version" => client_version,
+        "build" => client_build
       },
       "timezone" => timezone
     }) do
 
-    case device_type do
-      "iOS" ->
-        name = name
-        |> String.downcase
+    name = name
+    |> String.downcase
 
-        user = Repo.get_by(User, name: name)
+    user = Repo.get_by(User, name: name)
 
-        if device_token == "" do
-          device_token = nil
-        end
+    if device_token == "" do
+      device_token = nil
+    end
 
-        case user do
-          nil ->
-            conn
-            |> put_status(404)
-            |> json(%{success: false, error: "NOT-REGISTERED", message: "A user with that name is not registered."})
-          user ->
-            if Bcrypt.checkpw(password, user.password) do
+    case user do
+      nil ->
+        conn
+        |> put_status(404)
+        |> json(%{success: false, error: "NOT-REGISTERED", message: "A user with that name is not registered."})
+      user ->
+        if Bcrypt.checkpw(password, user.password) do
 
-              device = if device_token, do: Repo.get_by(Device, %{user_id: user.id, token: device_token}, else: nil)
-              case device do
-                nil ->
-                  device = Ecto.build_assoc(user, :devices, %{token: device_token, name: device_name, type: device_type, token_status: :default})
-                  case Repo.insert(device) do
-                    {:ok, new_device} ->
-                      device = new_device
-                    {:error, changeset} ->
-                      conn
-                      |> put_status(400)
-                      |> json(%{success: false, error: "INVALID", message: "Could not save device information"})
-                  end
-                %Device{} ->
-                  changeset = Device.changeset(device, %{name: device_name, type: device_type})
-                  case Repo.update(changeset) do
-                    {:ok, new_device} ->
-                      device = new_device
-                    {:error, changeset} ->
-                      conn
-                      |> put_status(400)
-                      |> json(%{success: false, error: "INVALID", message: "Could not update stored device information"})
-                  end
-              end
+          client = Repo.get_by(Client, %{name: client_name, version: client_version, build: client_build})
+          if client == nil do
+            new_client = Client.changeset(%Client{}, %{name: client_name, version: client_version, build: client_build})
+            client = Repo.insert!(new_client)
+          end
 
-              session = Session
-              |> Repo.get_by(device_id: device.id)
+          platform = Repo.get_by(Platform, %{type: platform_type, version: platform_version})
+          if platform == nil do
+            new_platform = Platform.changeset(%Platform{}, %{type: platform_type, version: platform_version})
+            platform = Repo.insert!(new_platform)
+          end
+          IO.inspect(platform)
 
-              if session != nil do
-                end_session session
-              end
-
-              session_token = SecureRandom.base64(32)
-              new_session = Ecto.build_assoc(device, :session, %{token: session_token, timezone: timezone})
-              case Repo.insert(new_session) do
-                {:ok, _session} ->
-                  json conn, %{success: true, session_token: session_token}
+          device = if device_token, do: Repo.get_by(Device, %{user_id: user.id, token: device_token}, else: nil)
+          case device do
+            nil ->
+              device = Ecto.build_assoc(user, :devices, %{token: device_token, name: device_name, platform: platform, token_status: :default})
+              case Repo.insert(device) do
+                {:ok, new_device} ->
+                  device = new_device
                 {:error, changeset} ->
                   conn
                   |> put_status(400)
-                  |> json(%{success: false, error: "FAILED-TO-CREATE-SESSION", message: "Could not create a session with given parameters"})
+                  |> json(%{success: false, error: "INVALID", message: "Could not save device information"})
               end
+            %Device{} ->
+              device = device |> Repo.preload(:platform)
+              changeset = Device.changeset(device, %{name: device_name})
+              |> Ecto.Changeset.put_assoc(:platform, platform)
+              case Repo.update(changeset) do
+                {:ok, new_device} ->
+                  device = new_device
+                {:error, changeset} ->
+                  conn
+                  |> put_status(400)
+                  |> json(%{success: false, error: "INVALID", message: "Could not update stored device information"})
+              end
+          end
 
-            else
-              json conn, %{success: false, error: "INVALID-PASSWORD", message: "The password did not match our records"}
-            end
+          session = Session
+          |> Repo.get_by(device_id: device.id)
+
+          if session != nil do
+            end_session session
+          end
+
+          session_token = SecureRandom.base64(32)
+          new_session = Ecto.build_assoc(device, :session, %{token: session_token, timezone: timezone, client: client})
+          case Repo.insert(new_session) do
+            {:ok, _session} ->
+              json conn, %{success: true, session_token: session_token}
+            {:error, changeset} ->
+              conn
+              |> put_status(400)
+              |> json(%{success: false, error: "FAILED-TO-CREATE-SESSION", message: "Could not create a session with given parameters"})
+          end
+
+        else
+          json conn, %{success: false, error: "INVALID-PASSWORD", message: "The password did not match our records"}
         end
-      _ ->
-        json conn, %{success: false, error: "INVALID-DEVICE-TYPE", message: "The device type is not recognised"}
     end
-
   end
 
   def logout(conn, %{"session_token" => session_token}) do
