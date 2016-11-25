@@ -5,7 +5,7 @@
 // and connect at the socket path in "lib/my_app/endpoint.ex":
 import {Socket} from "phoenix"
 
-let socket = new Socket("/socket", {params: {token: window.userToken}})
+let socket = new Socket("/echo", {params: {token: window.userToken}})
 let chatInput         = $("#chat-input")
 let messagesContainer = $("#messages")
 
