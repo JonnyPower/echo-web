@@ -86,7 +86,7 @@ defmodule Echo.UserController do
           end
           IO.inspect(platform)
 
-          device = if device_token, do: Repo.get_by(Device, %{user_id: user.id, token: device_token}, else: nil)
+          device = Repo.get_by(Device, %{user_id: user.id, name: device_name})
           case device do
             nil ->
               device = Ecto.build_assoc(user, :devices, %{token: device_token, name: device_name, platform: platform, token_status: :default})
@@ -100,8 +100,12 @@ defmodule Echo.UserController do
               end
             %Device{} ->
               device = device |> Repo.preload(:platform)
-              changeset = Device.changeset(device, %{name: device_name})
-              |> Ecto.Changeset.put_assoc(:platform, platform)
+              changeset = Device.changeset(device, %{token: device_token})
+              if platform.id !== device.platform.id do
+                IO.puts("Platform has changed for device, updating")
+                IO.inspect(device.platform)
+                changeset = changeset |> Ecto.Changeset.put_assoc(:platform, platform)
+              end
               case Repo.update(changeset) do
                 {:ok, new_device} ->
                   device = new_device

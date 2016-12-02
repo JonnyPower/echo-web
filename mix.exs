@@ -43,7 +43,7 @@ defmodule Echo.Mixfile do
      {:secure_random, "~> 0.1"},
      {:timex, "~> 3.0"},
      {:timex_ecto, "~> 3.0"},
-     {:gcm, "~> 1.2"},
+     {:gcm, "~> 1.4"},
      {:ecto_enum, git: "https://github.com/mtwilliams/ecto_enum", branch: "master"}]
   end
 

@@ -10,7 +10,7 @@ defmodule Echo.Device do
     field :token_status, TokenStatusEnum
 
     belongs_to :user, Echo.User, foreign_key: :user_id
-    belongs_to :platform, Echo.Platform
+    belongs_to :platform, Echo.Platform, on_replace: :nilify
 
     has_one :session, Echo.Session
     has_many :messages, Echo.Message
@@ -32,7 +32,6 @@ defmodule Echo.Device do
     |> cast(params, @required_fields, @optional_fields)
     |> assoc_constraint(:user)
     |> assoc_constraint(:platform)
-    |> unique_constraint(:token, name: "device_unique_token")
   end
 
 end

@@ -42,4 +42,4 @@ config :echo, Echo.Repo,
   pool_size: 10
 
 config :echo, Echo.GCMWorker,
-  api_key: "AIzaSyAxqPrw3plEiEkoDvkJrljrTz5yMSQLMvI"
+  api_key: "AAAAFvLnbyE:APA91bHCHZZazy9oJvUr-JJwaENNEHzZF1UNeZit32GRGURKPyPaAm1rgvmXT29DtuleWfNEqoSnuaLej-uwoNlvb2Fe-cGAPCywYXFNDIT3jlT2MHY3EOMJdVBT6IE2ycDWfj5gA9oZMuhQrvcSTEtz-GrdPndBnQ"

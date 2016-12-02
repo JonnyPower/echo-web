@@ -10,9 +10,10 @@ defmodule Echo.EchoChannel do
   import Ecto.Query, only: [from: 2]
 
   def join("echoes:" <> name, _payload, socket) do
+    name = String.downcase(name)
     if socket.assigns.auth.user.name == name do
       Echo.Endpoint.broadcast_from! self(), "echoes:" <> name,
-        "presense", %{status: "Online", id: socket.assigns.auth.device.id}
+        "presense", %{status: "Online", id: socket.assigns.auth.device.id, name: socket.assigns.auth.device.name}
       session = Repo.get_by!(Session, token: socket.assigns.auth.token)
       {:ok, %{messages: history(0, socket.assigns.auth.user.id, session.timezone)}, socket}
     else
@@ -38,12 +39,12 @@ defmodule Echo.EchoChannel do
     device = Repo.get!(Device, socket.assigns.auth.device.id)
 
     {:ok, date_sent} = sent
-    |> Timex.parse("{ISO:Basic:Z}")
+    |> Timex.parse("{ISO:Basic}")
 
     message = Ecto.build_assoc(device, :messages, %{content: content, sent: date_sent})
     case Repo.insert(message) do
       {:ok, message} ->
-        broadcast_from socket, "message", message_map(message)
+        broadcast_from! socket, "message", message_map(message)
 
         {:ok, pid} = Supervisor.start_child(Echo.Notify, [message, []])
         GenServer.cast(pid, :push)
