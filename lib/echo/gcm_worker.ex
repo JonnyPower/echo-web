@@ -33,7 +33,7 @@ defmodule Echo.GCMWorker do
     |> Repo.all
     |> MapSet.new
 
-    push(tokens, message.content)
+    push(tokens, device.name, message.content)
 
     {:stop, :normal, message}
   end
@@ -41,24 +41,38 @@ defmodule Echo.GCMWorker do
   defp push([], _) do
   end
 
-  defp push(tokens, message_content) do
-    api_key = Application.get_env(:echo, Echo.GCMWorker)[:api_key]
-    gcm_response = GCM.push(api_key, MapSet.to_list(tokens), %{
-      notification: %{
-        sound: "default",
-        alert: "default",
-        body: message_content,
-        badge: "1"
-      },
-      content_available: true,
-      priority: "high"
-    })
-    IO.inspect(gcm_response)
-    handle_response(gcm_response, message_content, tokens)
+  defp push(tokens, message_content) when is_list(tokens) do
+    push(tokens |> MapSet.new, nil, message_content)
+  end
+
+  defp push(tokens, from_device_name, message_content) do
+    if MapSet.size(tokens) > 0 do
+      api_key = Application.get_env(:echo, Echo.GCMWorker)[:api_key]
+      notification_body = message_content
+      if from_device_name !== nil && String.strip(from_device_name) != "" do
+        notification_body = from_device_name <> ": " <> message_content
+      end
+      gcm_response = GCM.push(api_key, MapSet.to_list(tokens), %{
+        notification: %{
+          sound: "default",
+          alert: "default",
+          body: notification_body,
+          badge: "1"
+        },
+        content_available: true,
+        priority: "high"
+      })
+      IO.inspect(gcm_response)
+      handle_response(gcm_response, message_content, tokens)
+    end
   end
 
   defp handle_response({:error, :unauthorized}, _, _) do
     # Configuration error
+  end
+
+  defp handle_response({:error, :bad_request}, _, _) do
+    # Bad request
   end
 
   defp handle_response({:ok, response}, message_content, tokens) do

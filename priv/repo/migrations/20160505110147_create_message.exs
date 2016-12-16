@@ -3,7 +3,7 @@ defmodule Echo.Repo.Migrations.CreateMessage do
 
   def change do
     create table(:messages) do
-      add :content, :string
+      add :content, :text
       add :sent, :datetime
       add :device_id, references(:devices, on_delete: :nothing)
 

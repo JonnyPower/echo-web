@@ -7,18 +7,26 @@ defmodule Echo.EchoChannel do
   alias Echo.Repo
   alias Echo.Notify
   alias Echo.Session
+  alias Echo.EchoPresence
   import Ecto.Query, only: [from: 2]
 
   def join("echoes:" <> name, _payload, socket) do
+    send(self, :after_join)
     name = String.downcase(name)
     if socket.assigns.auth.user.name == name do
-      Echo.Endpoint.broadcast_from! self(), "echoes:" <> name,
-        "presense", %{status: "Online", id: socket.assigns.auth.device.id, name: socket.assigns.auth.device.name}
       session = Repo.get_by!(Session, token: socket.assigns.auth.token)
       {:ok, %{messages: history(0, socket.assigns.auth.user.id, session.timezone)}, socket}
     else
       {:error, %{reason: "unauthorized"}}
     end
+  end
+
+  def handle_info(:after_join, socket) do
+    push socket, "presence_state", EchoPresence.list(socket)
+    {:ok, _} = EchoPresence.track(socket, socket.assigns.auth.device.id, %{
+      online_at: inspect(System.system_time(:seconds))
+    })
+    {:noreply, socket}
   end
 
   def handle_in("ping", payload, socket) do
@@ -41,17 +49,25 @@ defmodule Echo.EchoChannel do
     {:ok, date_sent} = sent
     |> Timex.parse("{ISO:Basic}")
 
-    message = Ecto.build_assoc(device, :messages, %{content: content, sent: date_sent})
-    case Repo.insert(message) do
-      {:ok, message} ->
-        broadcast_from! socket, "message", message_map(message)
+    message = Message.changeset(%Message{}, %{content: content, sent: date_sent, device_id: device.id})
 
-        {:ok, pid} = Supervisor.start_child(Echo.Notify, [message, []])
-        GenServer.cast(pid, :push)
+    #message = Ecto.build_assoc(device, :messages, %{content: content, sent: date_sent})
+    case message.valid? do
+      true ->
+        case Repo.insert(message) do
+          {:ok, message} ->
+            broadcast_from! socket, "message", message_map(message)
 
-        {:reply, {:ok, %{message_id: message.id}}, socket}
-      {:error, error} ->
-        {:reply, {:error, %{message: error}}, socket}
+            {:ok, pid} = Supervisor.start_child(Echo.Notify, [message, []])
+            GenServer.cast(pid, :push)
+
+            {:reply, {:ok, %{message_id: message.id}}, socket}
+          {:error, error} ->
+            {:reply, {:error, %{message: error}}, socket}
+        end
+      false ->
+        IO.inspect(message)
+        {:reply, {:error, %{errors: Enum.map(message.errors, & Echo.ErrorHelpers.translate_error(&1))}}, socket}
     end
   end
 

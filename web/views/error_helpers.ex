@@ -14,6 +14,10 @@ defmodule Echo.ErrorHelpers do
     end
   end
 
+  def translate_error({tag, {msg, opts}}) when is_atom(tag) do
+    (Atom.to_string(tag) |> String.capitalize) <> " " <> translate_error({msg, opts})
+  end
+
   def translate_error({msg, opts}) do
      # Because error messages were defined within Ecto, we must
      # call the Gettext module passing our Gettext backend. We
@@ -34,4 +38,5 @@ defmodule Echo.ErrorHelpers do
        Gettext.dgettext(Echo.Gettext, "errors", msg, opts)
      end
   end
+
 end
